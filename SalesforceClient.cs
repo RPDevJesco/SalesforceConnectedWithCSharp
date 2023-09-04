@@ -103,7 +103,7 @@ namespace SalesforceConnectedWithCSharp
                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-                var request = new HttpRequestMessage(new HttpMethod("PATCH"), requestUri)
+                var request = new HttpRequestMessage(new HttpMethod("POST"), requestUri)
                 {
                     Content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json")
                 };
