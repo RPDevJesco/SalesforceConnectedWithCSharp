@@ -19,12 +19,17 @@
 
         public async Task<string> CreateAsync(string objectName, object data)
         {
-            return await _client.AsyncCreateRequest(_token, _instanceUrl, objectName, data);
+            return await _client.AsyncInsertRequest(_token, _instanceUrl, objectName, data);
         }
 
         public async Task<string> UpdateAsync(string objectName, string id, object data)
         {
             return await _client.AsyncUpdateRequest(_token, _instanceUrl, objectName, id, data);
+        }
+
+        public async Task<string> UpsertAsync(string objectName, object data, string recordId = null)
+        {
+            return await _client.AsyncUpsertRequest(_token, _instanceUrl, objectName, data, recordId);
         }
 
         public async Task<string> DeleteAsync(string objectName, string id)

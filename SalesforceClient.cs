@@ -48,6 +48,7 @@ namespace SalesforceConnectedWithCSharp
             }
         }
 
+        // View operation
         public async Task<string> AsyncGetRequest(string token, string url, string query)
         {
             using (HttpClient _httpClient = new HttpClient())
@@ -64,7 +65,8 @@ namespace SalesforceConnectedWithCSharp
             }
         }
 
-        public async Task<string> AsyncCreateRequest(string token, string instanceUrl, string objectName, object data)
+        // Insert operation
+        public async Task<string> AsyncInsertRequest(string token, string instanceUrl, string objectName, object data)
         {
             using (HttpClient httpClient = new HttpClient())
             {
@@ -91,26 +93,6 @@ namespace SalesforceConnectedWithCSharp
             }
         }
 
-        // DELETE operation
-        public async Task<string> AsyncDeleteRequest(string token, string instanceUrl, string objectName, string recordId)
-        {
-            using (HttpClient httpClient = new HttpClient())
-            {
-                var requestUri = new Uri(new Uri(instanceUrl), $"{Constants.TOKEN_REQUEST_POSTURL}{objectName}/{recordId}");
-
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                var responseMessage = await httpClient.DeleteAsync(requestUri).ConfigureAwait(false);
-
-                if (!responseMessage.IsSuccessStatusCode)
-                {
-                    throw new Exception($"Failed to delete record. Status: {responseMessage.StatusCode}, Message: {await responseMessage.Content.ReadAsStringAsync()}");
-                }
-
-                return await responseMessage.Content.ReadAsStringAsync().ConfigureAwait(false);
-            }
-        }
-
         // UPDATE operation
         public async Task<string> AsyncUpdateRequest(string token, string instanceUrl, string objectName, string recordId, object data)
         {
@@ -131,6 +113,41 @@ namespace SalesforceConnectedWithCSharp
                 if (!responseMessage.IsSuccessStatusCode)
                 {
                     throw new Exception($"Failed to update record. Status: {responseMessage.StatusCode}, Message: {await responseMessage.Content.ReadAsStringAsync()}");
+                }
+
+                return await responseMessage.Content.ReadAsStringAsync().ConfigureAwait(false);
+            }
+        }
+
+        // UPSERT operation
+        public async Task<string> AsyncUpsertRequest(string token, string instanceUrl, string objectName, object data, string recordId = null)
+        {
+            if (string.IsNullOrEmpty(recordId))
+            {
+                // Call the create function if the recordId is not provided
+                return await AsyncInsertRequest(token, instanceUrl, objectName, data).ConfigureAwait(false);
+            }
+            else
+            {
+                // Call the update function if the recordId is provided
+                return await AsyncUpdateRequest(token, instanceUrl, objectName, recordId, data).ConfigureAwait(false);
+            }
+        }
+
+        // DELETE operation
+        public async Task<string> AsyncDeleteRequest(string token, string instanceUrl, string objectName, string recordId)
+        {
+            using (HttpClient httpClient = new HttpClient())
+            {
+                var requestUri = new Uri(new Uri(instanceUrl), $"{Constants.TOKEN_REQUEST_POSTURL}{objectName}/{recordId}");
+
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var responseMessage = await httpClient.DeleteAsync(requestUri).ConfigureAwait(false);
+
+                if (!responseMessage.IsSuccessStatusCode)
+                {
+                    throw new Exception($"Failed to delete record. Status: {responseMessage.StatusCode}, Message: {await responseMessage.Content.ReadAsStringAsync()}");
                 }
 
                 return await responseMessage.Content.ReadAsStringAsync().ConfigureAwait(false);

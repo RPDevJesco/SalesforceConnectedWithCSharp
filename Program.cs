@@ -15,11 +15,13 @@ namespace SalesforceConnectedWithCSharp
             var account = await crudOperations.GetAsync("SELECT Id, Name FROM Account LIMIT 1");
             var accountData = new Dictionary<string, object>
             {
-                { "Name", "John Doe" },
-                { "Industry", "Software" }
+                { "Name", "John Smith" },
+                { "Industry", "Software" },
+                { "AccountNumber", "CC977211-E" }
             };
-            await crudOperations.CreateAsync("Account", accountData);
-            
+            // recordId is an optional parameter for UpsertAsync. Without the Id, it will do an insert operation, with it, it will update.
+            await crudOperations.UpsertAsync("Account", accountData);
+            //await crudOperations.DeleteAsync("Account", "001Dn00000erJ1LIAU");
             Console.WriteLine(account);
         }
     }
