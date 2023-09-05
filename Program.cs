@@ -2,6 +2,7 @@
 using Newtonsoft.Json;
 
 using SalesforceConnectedWithCSharp.DataReader;
+using SalesforceConnectedWithCSharp.Helpers;
 using SalesforceConnectedWithCSharp.SalesforceAPI;
 
 namespace SalesforceConnectedWithCSharp
@@ -17,7 +18,7 @@ namespace SalesforceConnectedWithCSharp
             await client.AuthorizeAsync();
             token = client.Token;
             instanceUrl = client.InstanceUrl;
-            await BatchAPIDataReaderUsage();
+            await DownloadSalesforceData();
         }
 
         static async Task GetDataFromSalesforce()
@@ -79,6 +80,17 @@ namespace SalesforceConnectedWithCSharp
                 "Account",
                 BatchOperations.GetOperationDescription(BatchOperations.Operations.Insert),
                 accountData);
+        }
+
+        static async Task DownloadSalesforceData()
+        {
+            SalesforceFileDownloader fileDownloader = new SalesforceFileDownloader(token, instanceUrl);
+
+            var directoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "SalesforceData");
+            Directory.CreateDirectory(directoryPath);
+
+            var filename = "Accounts.json";
+            await fileDownloader.DownloadAndSaveDataAsJsonAsync(directoryPath, filename, SOQLGeneration.GenerateSoqlForAccount());
         }
     }
 }
