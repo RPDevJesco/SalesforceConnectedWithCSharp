@@ -1,4 +1,5 @@
-﻿using YamlDotNet.Serialization;
+﻿using SalesforceConnectedWithCSharp.SalesforceAPI;
+using YamlDotNet.Serialization;
 
 namespace SalesforceConnectedWithCSharp.DataReader
 {
@@ -6,16 +7,26 @@ namespace SalesforceConnectedWithCSharp.DataReader
     {
         private readonly SalesforceCRUD _sfCRUD;
 
+        public YamlDataReader()
+        {
+
+        }
+
         public YamlDataReader(string token, string instanceUrl)
         {
             _sfCRUD = new SalesforceCRUD(token, instanceUrl);
         }
 
-        public async Task UpsertDataFromYaml(string filePath, string objectName, string idColumnName = "Id")
+        public List<Dictionary<string, object>> ParseYaml(string filePath)
         {
             var yamlData = File.ReadAllText(filePath);
             var deserializer = new Deserializer();
-            var records = deserializer.Deserialize<List<Dictionary<string, object>>>(yamlData);
+            return deserializer.Deserialize<List<Dictionary<string, object>>>(yamlData);
+        }
+
+        public async Task AsyncUpsertYAMLData(string filePath, string objectName, string idColumnName = "Id")
+        {
+            var records = ParseYaml(filePath);
 
             // Get the corresponding DTO type from objectName
             Type dtoType = Type.GetType($"SalesforceConnectedWithCSharp.SalesforceDTO.{objectName}");

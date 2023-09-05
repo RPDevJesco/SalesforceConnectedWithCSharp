@@ -1,5 +1,9 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SalesforceConnectedWithCSharp.SalesforceAPI;
+
+using System.Linq;
+using System.Xml.Linq;
 
 namespace SalesforceConnectedWithCSharp.DataReader
 {
@@ -7,15 +11,40 @@ namespace SalesforceConnectedWithCSharp.DataReader
     {
         private readonly SalesforceCRUD _sfCRUD;
 
+        public JsonDataReader()
+        {
+            
+        }
+
         public JsonDataReader(string token, string instanceUrl)
         {
             _sfCRUD = new SalesforceCRUD(token, instanceUrl);
         }
 
-        public async Task UpsertDataFromJson(string filePath, string objectName, string idColumnName = "Id")
+        public List<Dictionary<string, object>> ParseXml(string filePath)
         {
-            var jsonData = File.ReadAllText(filePath);
-            var records = JsonConvert.DeserializeObject<List<JObject>>(jsonData);
+            var xDocument = XDocument.Load(filePath);
+
+            // Assuming the XML structure is consistent
+            var xmlRecords = xDocument.Descendants("record");
+
+            var dataList = new List<Dictionary<string, object>>();
+            foreach (var xmlRecord in xmlRecords)
+            {
+                var data = new Dictionary<string, object>();
+                foreach (var element in xmlRecord.Elements())
+                {
+                    data[element.Name.LocalName] = element.Value;
+                }
+                dataList.Add(data);
+            }
+
+            return dataList;
+        }
+
+        public async Task AsyncUpsertXMLData(string filePath, string objectName, string idColumnName = "Id")
+        {
+            var records = ParseXml(filePath);
 
             // Get the corresponding DTO type from objectName
             Type dtoType = Type.GetType($"SalesforceConnectedWithCSharp.SalesforceDTO.{objectName}");
@@ -27,33 +56,27 @@ namespace SalesforceConnectedWithCSharp.DataReader
 
             var dtoProperties = dtoType.GetProperties().Select(p => p.Name).ToList();
 
-            // Assuming the first record can be used to derive the keys (headers)
-            var headersFromJson = records[0].Properties().Select(p => p.Name).ToList();
-            var recognizedHeaders = headersFromJson.Where(h => dtoProperties.Contains(h)).ToList();
-
             foreach (var record in records)
             {
                 var dto = Activator.CreateInstance(dtoType);
-                foreach (var header in recognizedHeaders)
+                foreach (var property in dtoProperties)
                 {
-                    var cellValue = record[header]?.ToString();
-
-                    // Check if the cell value is blank or null and continue to the next iteration if it is.
-                    if (string.IsNullOrWhiteSpace(cellValue))
-                        continue;
-
-                    var property = dtoType.GetProperty(header);
-                    if (property != null)
+                    if (record.ContainsKey(property))
                     {
-                        // Check if property type is boolean and handle conversion
-                        if (property.PropertyType == typeof(bool))
+                        var propertyValue = record[property]?.ToString();
+                        var propertyInfo = dtoType.GetProperty(property);
+                        if (propertyInfo != null)
                         {
-                            bool boolValue = cellValue.Trim().ToLower() == "true" || cellValue == "1";
-                            property.SetValue(dto, boolValue);
-                        }
-                        else
-                        {
-                            property.SetValue(dto, Convert.ChangeType(cellValue, property.PropertyType));
+                            // Check if property type is boolean and handle conversion
+                            if (propertyInfo.PropertyType == typeof(bool))
+                            {
+                                bool boolValue = propertyValue.Trim().ToLower() == "true" || propertyValue == "1";
+                                propertyInfo.SetValue(dto, boolValue);
+                            }
+                            else
+                            {
+                                propertyInfo.SetValue(dto, Convert.ChangeType(propertyValue, propertyInfo.PropertyType));
+                            }
                         }
                     }
                 }
@@ -81,7 +104,7 @@ namespace SalesforceConnectedWithCSharp.DataReader
                 }
             }
 
-            Console.WriteLine("UpsertDataFromJson Complete");
+            Console.WriteLine("UpsertDataFromXml Complete");
         }
     }
 }

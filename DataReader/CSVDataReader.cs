@@ -1,5 +1,6 @@
 ﻿using CsvHelper;
 using CsvHelper.Configuration;
+using SalesforceConnectedWithCSharp.SalesforceAPI;
 using System.Globalization;
 
 namespace SalesforceConnectedWithCSharp.DataReader
@@ -8,13 +9,20 @@ namespace SalesforceConnectedWithCSharp.DataReader
     {
         private readonly SalesforceCRUD _sfCRUD;
 
+        public CsvDataReader()
+        {
+            
+        }
+
         public CsvDataReader(string token, string instanceUrl)
         {
             _sfCRUD = new SalesforceCRUD(token, instanceUrl);
         }
 
-        public async Task UpsertDataFromCsv(string filePath, string objectName, string idColumnName = "Id")
+        public async Task<List<Dictionary<string, object>>> ParseCSV(string filePath, string objectName)
         {
+            var recordsList = new List<Dictionary<string, object>>();
+
             using var reader = new StreamReader(filePath);
             using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
             {
@@ -24,35 +32,32 @@ namespace SalesforceConnectedWithCSharp.DataReader
 
             var records = csv.GetRecords<Dictionary<string, object>>().ToList();
 
-            // Get the corresponding DTO type from objectName
             Type dtoType = Type.GetType($"SalesforceConnectedWithCSharp.SalesforceDTO.{objectName}");
             if (dtoType == null)
             {
                 Console.WriteLine($"DTO for {objectName} not found!");
-                return;
+                return recordsList;
             }
 
             var dtoProperties = dtoType.GetProperties().Select(p => p.Name).ToList();
-
-            // Assuming the first record can be used to derive the keys (headers)
             var headersFromCsv = records[0].Keys.ToList();
             var recognizedHeaders = headersFromCsv.Where(h => dtoProperties.Contains(h)).ToList();
 
             foreach (var record in records)
             {
+                var data = new Dictionary<string, object>();
                 var dto = Activator.CreateInstance(dtoType);
+
                 foreach (var header in recognizedHeaders)
                 {
                     var cellValue = record[header]?.ToString();
 
-                    // Check if the cell value is blank or null and continue to the next iteration if it is.
                     if (string.IsNullOrWhiteSpace(cellValue))
                         continue;
 
                     var property = dtoType.GetProperty(header);
                     if (property != null)
                     {
-                        // Check if property type is boolean and handle conversion
                         if (property.PropertyType == typeof(bool))
                         {
                             bool boolValue = cellValue.Trim().ToLower() == "true" || cellValue == "1";
@@ -65,8 +70,6 @@ namespace SalesforceConnectedWithCSharp.DataReader
                     }
                 }
 
-                // Convert DTO back to dictionary 
-                var data = new Dictionary<string, object>();
                 foreach (var prop in dtoType.GetProperties())
                 {
                     data[prop.Name] = prop.GetValue(dto);
@@ -77,14 +80,26 @@ namespace SalesforceConnectedWithCSharp.DataReader
                     data.Remove("Id");
                 }
 
+                recordsList.Add(data);
+            }
+
+            return recordsList;
+        }
+
+        public async Task AsyncUpsertCSVData(string filePath, string objectName, string idColumnName = "Id")
+        {
+            var parsedRecords = await ParseCSV(filePath, objectName);
+
+            foreach (var record in parsedRecords)
+            {
                 if (record.ContainsKey(idColumnName))
                 {
                     var recordId = record[idColumnName].ToString();
-                    await _sfCRUD.UpdateAsync(objectName, recordId, data);
+                    await _sfCRUD.UpdateAsync(objectName, recordId, record);
                 }
                 else
                 {
-                    await _sfCRUD.CreateAsync(objectName, data);
+                    await _sfCRUD.CreateAsync(objectName, record);
                 }
             }
 

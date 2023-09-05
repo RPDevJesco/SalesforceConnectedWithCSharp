@@ -1,4 +1,7 @@
 ﻿using OfficeOpenXml;
+using SalesforceConnectedWithCSharp.SalesforceAPI;
+
+using System.Text;
 
 namespace SalesforceConnectedWithCSharp.DataReader
 {
@@ -6,30 +9,35 @@ namespace SalesforceConnectedWithCSharp.DataReader
     {
         private readonly SalesforceCRUD _sfCRUD;
 
+        public ExcelDataReader()
+        {
+            
+        }
+
         public ExcelDataReader(string token, string instanceUrl)
         {
             _sfCRUD = new SalesforceCRUD(token, instanceUrl);
         }
 
-        public async Task UpsertDataFromExcel(string filePath, string objectName, string idColumnName = "Id")
+        public async Task<List<Dictionary<string, object>>> ParseExcel(string filePath, string objectName)
         {
+            var recordsList = new List<Dictionary<string, object>>();
+
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             using (var package = new ExcelPackage(new FileInfo(filePath)))
             {
                 var worksheet = package.Workbook.Worksheets[0];
                 var rowCount = worksheet.Dimension.Rows;
 
-                // Get the corresponding DTO type from objectName
                 Type dtoType = Type.GetType($"SalesforceConnectedWithCSharp.SalesforceDTO.{objectName}");
                 if (dtoType == null)
                 {
                     Console.WriteLine($"DTO for {objectName} not found!");
-                    return;
+                    return recordsList;
                 }
 
                 var dtoProperties = dtoType.GetProperties().Select(p => p.Name).ToList();
 
-                // Validate Excel headers against DTO properties
                 List<string> headersFromExcel = new List<string>();
                 for (int col = 1; col <= worksheet.Dimension.Columns; col++)
                 {
@@ -38,25 +46,22 @@ namespace SalesforceConnectedWithCSharp.DataReader
 
                 List<string> recognizedHeaders = headersFromExcel.Where(h => dtoProperties.Contains(h)).ToList();
 
-                // Identify the column for the ID
-                int idColumnIndex = recognizedHeaders.IndexOf(idColumnName);
-
                 for (int row = 2; row <= rowCount; row++)
                 {
+                    var data = new Dictionary<string, object>();
                     var dto = Activator.CreateInstance(dtoType);
+
                     foreach (var header in recognizedHeaders)
                     {
-                        int col = headersFromExcel.IndexOf(header) + 1;  // +1 because Excel is 1-based indexing
+                        int col = headersFromExcel.IndexOf(header) + 1;
                         var cellValue = worksheet.Cells[row, col].Text;
 
-                        // Check if the cell value is blank or null and continue to the next iteration if it is.
                         if (string.IsNullOrWhiteSpace(cellValue))
                             continue;
 
                         var property = dtoType.GetProperty(header);
                         if (property != null)
                         {
-                            // Check if property type is boolean and handle conversion
                             if (property.PropertyType == typeof(bool))
                             {
                                 bool boolValue = cellValue.Trim().ToLower() == "true" || cellValue == "1";
@@ -69,8 +74,6 @@ namespace SalesforceConnectedWithCSharp.DataReader
                         }
                     }
 
-                    // Convert DTO back to dictionary 
-                    var data = new Dictionary<string, object>();
                     foreach (var prop in dtoType.GetProperties())
                     {
                         data[prop.Name] = prop.GetValue(dto);
@@ -81,19 +84,34 @@ namespace SalesforceConnectedWithCSharp.DataReader
                         data.Remove("Id");
                     }
 
-                    if (idColumnIndex != -1)
-                    {
-                        var recordId = worksheet.Cells[row, idColumnIndex + 1].Text;
-
-                        await _sfCRUD.UpdateAsync(objectName, recordId, data);
-                    }
-                    else
-                    {
-                        await _sfCRUD.CreateAsync(objectName, data);
-                    }
+                    recordsList.Add(data);
                 }
             }
+            return recordsList;
+        }
+
+        public async Task UpsertExcelData(string filePath, string objectName, string idColumnName = "Id")
+        {
+            var parsedRecords = await ParseExcel(filePath, objectName);
+
+            // Identify the column for the ID outside the loop to avoid recalculating
+            int idColumnIndex = parsedRecords[0].ContainsKey(idColumnName) ? parsedRecords[0].Keys.ToList().IndexOf(idColumnName) : -1;
+
+            foreach (var record in parsedRecords)
+            {
+                if (idColumnIndex != -1)
+                {
+                    var recordId = record[idColumnName].ToString();
+                    await _sfCRUD.UpdateAsync(objectName, recordId, record);
+                }
+                else
+                {
+                    await _sfCRUD.CreateAsync(objectName, record);
+                }
+            }
+
             Console.WriteLine("UpsertDataFromExcel Complete");
         }
+
     }
 }

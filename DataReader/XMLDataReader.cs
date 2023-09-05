@@ -1,4 +1,5 @@
 ﻿using System.Xml.Linq;
+using SalesforceConnectedWithCSharp.SalesforceAPI;
 
 namespace SalesforceConnectedWithCSharp.DataReader
 {
@@ -6,26 +7,40 @@ namespace SalesforceConnectedWithCSharp.DataReader
     {
         private readonly SalesforceCRUD _sfCRUD;
 
+        public XmlDataReader()
+        {
+
+        }
+
         public XmlDataReader(string token, string instanceUrl)
         {
             _sfCRUD = new SalesforceCRUD(token, instanceUrl);
         }
 
-        public async Task UpsertDataFromXml(string filePath, string objectName, string idColumnName = "Id")
+        public List<Dictionary<string, object>> ParseXml(string filePath)
         {
             var xDocument = XDocument.Load(filePath);
 
-            // Assuming the XML structure is consistent and looks something like:
-            // <records>
-            //    <record>
-            //       <Id>123</Id>
-            //       <Name>John</Name>
-            //       ...
-            //    </record>
-            //    ...
-            // </records>
-
+            // Assuming the XML structure is consistent
             var xmlRecords = xDocument.Descendants("record");
+
+            var dataList = new List<Dictionary<string, object>>();
+            foreach (var xmlRecord in xmlRecords)
+            {
+                var data = new Dictionary<string, object>();
+                foreach (var element in xmlRecord.Elements())
+                {
+                    data[element.Name.LocalName] = element.Value;
+                }
+                dataList.Add(data);
+            }
+
+            return dataList;
+        }
+
+        public async Task AsyncUpsertXMLData(string filePath, string objectName, string idColumnName = "Id")
+        {
+            var records = ParseXml(filePath);
 
             // Get the corresponding DTO type from objectName
             Type dtoType = Type.GetType($"SalesforceConnectedWithCSharp.SalesforceDTO.{objectName}");
@@ -37,27 +52,26 @@ namespace SalesforceConnectedWithCSharp.DataReader
 
             var dtoProperties = dtoType.GetProperties().Select(p => p.Name).ToList();
 
-            foreach (var xmlRecord in xmlRecords)
+            foreach (var record in records)
             {
                 var dto = Activator.CreateInstance(dtoType);
-
                 foreach (var property in dtoProperties)
                 {
-                    var xmlElement = xmlRecord.Element(property);
-                    if (xmlElement != null)
+                    if (record.ContainsKey(property))
                     {
+                        var propertyValue = record[property]?.ToString();
                         var propertyInfo = dtoType.GetProperty(property);
                         if (propertyInfo != null)
                         {
                             // Check if property type is boolean and handle conversion
                             if (propertyInfo.PropertyType == typeof(bool))
                             {
-                                bool boolValue = xmlElement.Value.Trim().ToLower() == "true" || xmlElement.Value == "1";
+                                bool boolValue = propertyValue.Trim().ToLower() == "true" || propertyValue == "1";
                                 propertyInfo.SetValue(dto, boolValue);
                             }
                             else
                             {
-                                propertyInfo.SetValue(dto, Convert.ChangeType(xmlElement.Value, propertyInfo.PropertyType));
+                                propertyInfo.SetValue(dto, Convert.ChangeType(propertyValue, propertyInfo.PropertyType));
                             }
                         }
                     }
@@ -75,10 +89,9 @@ namespace SalesforceConnectedWithCSharp.DataReader
                     data.Remove("Id");
                 }
 
-                var idElement = xmlRecord.Element(idColumnName);
-                if (idElement != null)
+                if (record.ContainsKey(idColumnName))
                 {
-                    var recordId = idElement.Value;
+                    var recordId = record[idColumnName].ToString();
                     await _sfCRUD.UpdateAsync(objectName, recordId, data);
                 }
                 else
