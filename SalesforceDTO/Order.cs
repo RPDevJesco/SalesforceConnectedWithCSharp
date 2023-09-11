@@ -1,4 +1,4 @@
-﻿namespace SalesforceNetCore.SalesforceDTO
+﻿namespace SalesforceConnectedWithCSharp.SalesforceDTO
 {
     public class Order
     {
