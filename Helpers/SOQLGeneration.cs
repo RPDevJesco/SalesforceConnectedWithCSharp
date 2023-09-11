@@ -1,16 +1,14 @@
-﻿using System;
-using System.Linq;
-using System.Reflection;
+﻿using System.Reflection;
 using SalesforceConnectedWithCSharp.SalesforceDTO;
 
 namespace SalesforceConnectedWithCSharp.Helpers
 {
     public static class SOQLGeneration
     {
-        public static string GenerateSoqlForAccount(string additionalFields = null)
+        public static string GenerateSoqlForDto<T>(string additionalFields = null)
         {
-            Type accountType = typeof(Account);
-            PropertyInfo[] properties = accountType.GetProperties();
+            Type dtoType = typeof(T);
+            PropertyInfo[] properties = dtoType.GetProperties();
 
             // Convert properties to their string names
             var fieldList = properties.Select(p => p.Name).ToList();
@@ -28,7 +26,7 @@ namespace SalesforceConnectedWithCSharp.Helpers
             string fields = string.Join(", ", fieldList);
             Console.WriteLine($"fields: {fields}");
 
-            return $"SELECT {fields} FROM Account";
+            return $"SELECT {fields} FROM {dtoType.Name}";
         }
     }
 }

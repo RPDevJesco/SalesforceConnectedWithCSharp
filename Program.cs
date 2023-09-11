@@ -1,9 +1,8 @@
 ﻿using System.Net;
-using Newtonsoft.Json;
-
 using SalesforceConnectedWithCSharp.DataReader;
 using SalesforceConnectedWithCSharp.Helpers;
 using SalesforceConnectedWithCSharp.SalesforceAPI;
+using SalesforceConnectedWithCSharp.SalesforceDTO;
 
 namespace SalesforceConnectedWithCSharp
 {
@@ -89,8 +88,29 @@ namespace SalesforceConnectedWithCSharp
             var directoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "SalesforceData");
             Directory.CreateDirectory(directoryPath);
 
-            var filename = "Accounts.json";
-            await fileDownloader.DownloadAndSaveDataAsJsonAsync(directoryPath, filename, SOQLGeneration.GenerateSoqlForAccount());
+            var accountFilename = "Accounts.json";
+            await fileDownloader.DownloadAndSaveDataAsJsonAsync(directoryPath, accountFilename, SOQLGeneration.GenerateSoqlForDto<Account>());
+
+            var contactFilename = "Contact.json";
+            await fileDownloader.DownloadAndSaveDataAsJsonAsync(directoryPath, contactFilename, SOQLGeneration.GenerateSoqlForDto<Contact>());
+
+            var caseFilename = "Case.json";
+            await fileDownloader.DownloadAndSaveDataAsJsonAsync(directoryPath, caseFilename, SOQLGeneration.GenerateSoqlForDto<Case>());
+
+            var campaignFilename = "Campaign.json";
+            await fileDownloader.DownloadAndSaveDataAsJsonAsync(directoryPath, campaignFilename, SOQLGeneration.GenerateSoqlForDto<Campaign>());
+
+            var leadFilename = "Lead.json";
+            await fileDownloader.DownloadAndSaveDataAsJsonAsync(directoryPath, leadFilename, SOQLGeneration.GenerateSoqlForDto<Lead>());
+            
+            var opportunityFilename = "Opportunity.json";
+            await fileDownloader.DownloadAndSaveDataAsJsonAsync(directoryPath, opportunityFilename, SOQLGeneration.GenerateSoqlForDto<Opportunity>());
+            
+            var orderFilename = "Order.json";
+            await fileDownloader.DownloadAndSaveDataAsJsonAsync(directoryPath, orderFilename, SOQLGeneration.GenerateSoqlForDto<Order>());
+
+            var productFilename = "Product.json";
+            await fileDownloader.DownloadAndSaveDataAsJsonAsync(directoryPath, productFilename, SOQLGeneration.GenerateSoqlForDto<Product2>());
         }
     }
 }
